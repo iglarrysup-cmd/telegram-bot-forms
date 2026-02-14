@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Запрос в Jira</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 16px; box-sizing: border-box; background: var(--tg-theme-bg-color, #fff); color: var(--tg-theme-text-color, #000); }
+    * { box-sizing: border-box; }
+    h2 { margin: 0 0 16px; font-size: 1.1rem; }
+    .field { margin-bottom: 14px; }
+    .field label { display: block; margin-bottom: 4px; font-size: 0.9rem; color: var(--tg-theme-hint-color, #999); }
+    .field input, .field textarea, .field select { width: 100%; padding: 10px 12px; border: 1px solid var(--tg-theme-hint-color, #ddd); border-radius: 8px; font-size: 1rem; background: var(--tg-theme-bg-color); color: var(--tg-theme-text-color); }
+    .field textarea { min-height: 100px; resize: vertical; }
+    .field input:focus, .field textarea:focus { outline: none; border-color: var(--tg-theme-button-color, #2481cc); }
+    .required::after { content: ' *'; color: #c00; }
+    button { width: 100%; padding: 14px; margin-top: 16px; font-size: 1rem; font-weight: 600; border: none; border-radius: 8px; background: var(--tg-theme-button-color, #2481cc); color: var(--tg-theme-button-text-color, #fff); cursor: pointer; }
+    button:disabled { opacity: 0.6; cursor: not-allowed; }
+    .error { color: #c00; font-size: 0.85rem; margin-top: 8px; }
+    .success { color: #0a0; margin-top: 12px; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script>
+    (function() {
+      var Telegram = window.Telegram && window.Telegram.WebApp;
+      if (Telegram) Telegram.ready();
+
+      var FORM_CONFIG = {
+        "37": {
+          name: "Баг репорт",
+          fields: [
+            { id: "summary", label: "Резюме (краткое описание бага)", type: "text", required: true, jiraFieldId: "summary" },
+            { id: "customer", label: "Заказчик (от кого поступила информация о баге)", type: "text", required: false },
+            { id: "steps_and_actual", label: "Шаги воспроизведения и фактический результат", type: "textarea", required: true },
+            { id: "expected_result", label: "Ожидаемый результат", type: "textarea", required: false },
+            { id: "server", label: "Сервер, на котором произошла ошибка (Казино, Европа, ТБС)", type: "text", required: false },
+            { id: "link", label: "Ссылка на страницу, где произошел баг", type: "text", required: true },
+            { id: "client_id", label: "ID клиента", type: "text", required: false },
+            { id: "client_chat", label: "Чат клиента", type: "text", required: false }
+          ]
+        },
+        "38": {
+          name: "Запрос фичи",
+          fields: [
+            { id: "summary", label: "Фича (суть коротко, в одном предложении)", type: "text", required: true, jiraFieldId: "summary" },
+            { id: "customer", label: "Заказчик (кто заказал фичу с нашей стороны)", type: "text", required: true },
+            { id: "client_id", label: "ID клиента", type: "text", required: true },
+            { id: "site_link", label: "Ссылка на сайт клиента", type: "text", required: false },
+            { id: "problem", label: "Суть проблемы, которую нужно решить", type: "textarea", required: true },
+            { id: "business_value", label: "Бизнес ценность / польза от реализации фичи для клиента", type: "textarea", required: true },
+            { id: "solution", label: "Решение (если есть конкретное решение клиента)", type: "textarea", required: false },
+            { id: "client_chat", label: "Чат клиента", type: "text", required: false }
+          ]
+        },
+        "39": {
+          name: "Вопрос по админ панели Новой Империи / перевод админки",
+          fields: [
+            { id: "question_short", label: "Вопрос (коротко, в 1 предложении)", type: "text", required: true },
+            { id: "question_link", label: "Ссылка на конкретное место с вопросом", type: "text", required: false },
+            { id: "question_detail", label: "Сам вопрос (дополнительные сведения, детали)", type: "textarea", required: true },
+            { id: "client_chat", label: "Чат клиента", type: "text", required: false }
+          ]
+        },
+        "40": {
+          name: "Фронтэнд баг репорт",
+          fields: [
+            { id: "summary", label: "Summary", type: "text", required: true, jiraFieldId: "summary" },
+            { id: "steps", label: "Шаги воспроизведения", type: "textarea", required: true },
+            { id: "actual_result", label: "Фактический результат", type: "textarea", required: true },
+            { id: "expected_result", label: "Ожидаемый результат", type: "textarea", required: true },
+            { id: "site_owner", label: "Овнер сайта (менеджер)", type: "text", required: false },
+            { id: "domain", label: "Домен, на котором произошла ошибка", type: "text", required: true },
+            { id: "page_link", label: "Ссылка на страницу, где произошел баг", type: "text", required: false },
+            { id: "client_chat", label: "Чат клиента", type: "text", required: false }
+          ]
+        },
+        "42": {
+          name: "Создание сайта",
+          fields: [
+            { id: "summary", label: "Summary", type: "text", required: true, jiraFieldId: "summary" },
+            { id: "domain_name", label: "Название домена (например supercasino.net)", type: "text", required: true },
+            { id: "is_copy", label: "Копия ли это существующего сайта?", type: "select", required: true, options: [ { value: "yes", label: "Да" }, { value: "no", label: "Нет" } ] },
+            { id: "original_domain", label: "Если копия — домен оригинала", type: "text", required: false },
+            { id: "on_land", label: "На «земле» ли этот сайт?", type: "select", required: true, options: [ { value: "yes", label: "Да" }, { value: "no", label: "Нет" } ] },
+            { id: "host_name", label: "Название хоста", type: "text", required: true },
+            { id: "cloudflare_verified", label: "Cloudflare верифицирован?", type: "select", required: true, options: [ { value: "yes", label: "Да" }, { value: "no", label: "Нет" } ] },
+            { id: "captcha_creds", label: "Логин и пароль Captcha (для сайта на «земле» не нужен)", type: "text", required: false },
+            { id: "user_structure", label: "Структура пользователей в админке", type: "textarea", required: false },
+            { id: "payment_system", label: "Платежная система (на «земле» не заполнять)", type: "text", required: false },
+            { id: "client_chat", label: "Чат клиента", type: "text", required: false }
+          ]
+        },
+        "43": {
+          name: "Фронтэнд запрос / перевод сайта",
+          fields: [
+            { id: "summary", label: "Summary (что конкретно нужно сделать?)", type: "text", required: true, jiraFieldId: "summary" },
+            { id: "customer", label: "Заказчик (кто заказчик с нашей стороны)", type: "text", required: true },
+            { id: "domain", label: "Домен", type: "text", required: true },
+            { id: "page_link", label: "Ссылка на страницу, где нужно что-то сделать", type: "text", required: false },
+            { id: "what_to_do", label: "Что конкретно нужно сделать (желательно списком)", type: "textarea", required: false },
+            { id: "client_chat", label: "Чат клиента", type: "text", required: false }
+          ]
+        },
+        "44": {
+          name: "Вопрос / проблема по платежке",
+          fields: [
+            { id: "summary", label: "Вопрос или проблема (суть в 1 предложении)", type: "text", required: true, jiraFieldId: "summary" },
+            { id: "doc_link", label: "Ссылка на документацию платежной системы", type: "text", required: false },
+            { id: "support_contact", label: "Связь с поддержкой платежной системы (почта, сотрудник, способ связи)", type: "textarea", required: false },
+            { id: "additional", label: "Дополнительно", type: "textarea", required: false },
+            { id: "client_chat", label: "Чат клиента", type: "text", required: false }
+          ]
+        }
+      };
+
+      function getRequestTypeFromUrl() {
+        var params = new URLSearchParams(window.location.search);
+        return params.get("rt") || params.get("requestType") || "";
+      }
+
+      function renderForm(rt) {
+        var config = FORM_CONFIG[rt];
+        var root = document.getElementById("root");
+        if (!config) {
+          root.innerHTML = "<p>Неизвестный тип формы. Используйте кнопку в боте для выбора формы.</p>";
+          return;
+        }
+        var html = "<h2>" + escapeHtml(config.name) + "</h2>";
+        config.fields.forEach(function(f) {
+          var req = f.required ? " required" : "";
+          var reqClass = f.required ? " required" : "";
+          html += '<div class="field">';
+          html += '<label class="' + reqClass + '">' + escapeHtml(f.label) + '</label>';
+          if (f.type === "textarea") {
+            html += '<textarea id="f_' + escapeAttr(f.id) + '" name="' + escapeAttr(f.id) + '"' + req + '></textarea>';
+          } else if (f.type === "select" && f.options && f.options.length) {
+            html += '<select id="f_' + escapeAttr(f.id) + '" name="' + escapeAttr(f.id) + '"' + req + '>';
+            html += '<option value="">— выбрать —</option>';
+            f.options.forEach(function(opt) {
+              html += '<option value="' + escapeAttr(opt.value) + '">' + escapeHtml(opt.label) + '</option>';
+            });
+            html += '</select>';
+          } else {
+            html += '<input type="' + (f.type || "text") + '" id="f_' + escapeAttr(f.id) + '" name="' + escapeAttr(f.id) + '"' + req + '>';
+          }
+          html += '</div>';
+        });
+        html += '<button type="button" id="submitBtn">Отправить</button>';
+        html += '<div id="msg" class="error"></div>';
+        root.innerHTML = html;
+
+        document.getElementById("submitBtn").onclick = function() {
+          var values = {};
+          var ok = true;
+          config.fields.forEach(function(f) {
+            var el = document.getElementById("f_" + f.id);
+            var val = el ? el.value.trim() : "";
+            if (f.required && !val) ok = false;
+            values[f.id] = val;
+          });
+          var msgEl = document.getElementById("msg");
+          msgEl.className = "error";
+          if (!ok) {
+            msgEl.textContent = "Заполните обязательные поля (отмечены *).";
+            return;
+          }
+          msgEl.textContent = "";
+          var payload = {
+            requestTypeId: rt,
+            requestTypeName: config.name,
+            fieldValues: values,
+            fieldConfig: config.fields
+          };
+          if (Telegram && Telegram.sendData) {
+            Telegram.sendData(JSON.stringify(payload));
+          } else {
+            msgEl.textContent = "Отправка недоступна (откройте из Telegram).";
+          }
+        };
+      }
+
+      function escapeHtml(s) {
+        if (s == null) return "";
+        var d = document.createElement("div");
+        d.textContent = s;
+        return d.innerHTML;
+      }
+      function escapeAttr(s) {
+        if (s == null) return "";
+        return String(s).replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      }
+
+      var rt = getRequestTypeFromUrl();
+      renderForm(rt);
+    })();
+  </script>
+</body>
+</html>
