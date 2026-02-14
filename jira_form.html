@@ -29,8 +29,6 @@
       var Telegram = window.Telegram && window.Telegram.WebApp;
       if (Telegram) Telegram.ready();
 
-      // ——— Конфиг форм: request type id → название и поля. Поля «Вложение» нет (в Mini App нет загрузки файлов). ———
-      // jiraFieldId: в Jira стандартные summary, description; остальные могут быть customfield_XXXXX — поправь по настройкам типа запроса в Jira.
       var FORM_CONFIG = {
         "37": {
           name: "Баг репорт",
@@ -198,6 +196,7 @@
               Telegram.sendData(JSON.stringify(payload));
               msgEl.className = "success";
               msgEl.textContent = "Отправлено. Окно закроется.";
+              if (Telegram.close) Telegram.close();
             } catch (e) {
               // #region agent log
               _agentLog("sendData error", { err: String(e && e.message || e) });
