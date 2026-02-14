@@ -29,6 +29,8 @@
       var Telegram = window.Telegram && window.Telegram.WebApp;
       if (Telegram) Telegram.ready();
 
+      // ——— Конфиг форм: request type id → название и поля. Поля «Вложение» нет (в Mini App нет загрузки файлов). ———
+      // jiraFieldId: в Jira стандартные summary, description; остальные могут быть customfield_XXXXX — поправь по настройкам типа запроса в Jira.
       var FORM_CONFIG = {
         "37": {
           name: "Баг репорт",
@@ -153,7 +155,18 @@
         html += '<div id="msg" class="error"></div>';
         root.innerHTML = html;
 
+        // #region agent log
+        function _agentLog(msg, data) {
+          var p = { location: "jira_form.html:submit", message: msg, data: data || {}, timestamp: Date.now() };
+          fetch("http://127.0.0.1:7242/ingest/c65370e4-9dc5-4d9c-b417-1af06c9df9ee", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(p) }).catch(function() {});
+        }
+        // #endregion
+
         document.getElementById("submitBtn").onclick = function() {
+          var msgEl = document.getElementById("msg");
+          // #region agent log
+          _agentLog("submit click", { rt: rt, hasTelegram: !!Telegram, hasSendData: !!(Telegram && Telegram.sendData) });
+          // #endregion
           var values = {};
           var ok = true;
           config.fields.forEach(function(f) {
@@ -162,9 +175,11 @@
             if (f.required && !val) ok = false;
             values[f.id] = val;
           });
-          var msgEl = document.getElementById("msg");
           msgEl.className = "error";
           if (!ok) {
+            // #region agent log
+            _agentLog("validation failed", { rt: rt });
+            // #endregion
             msgEl.textContent = "Заполните обязательные поля (отмечены *).";
             return;
           }
@@ -176,9 +191,24 @@
             fieldConfig: config.fields
           };
           if (Telegram && Telegram.sendData) {
-            Telegram.sendData(JSON.stringify(payload));
+            try {
+              // #region agent log
+              _agentLog("calling sendData", { rt: rt });
+              // #endregion
+              Telegram.sendData(JSON.stringify(payload));
+              msgEl.className = "success";
+              msgEl.textContent = "Отправлено. Окно закроется.";
+            } catch (e) {
+              // #region agent log
+              _agentLog("sendData error", { err: String(e && e.message || e) });
+              // #endregion
+              msgEl.textContent = "Ошибка отправки: " + (e && e.message ? e.message : String(e));
+            }
           } else {
-            msgEl.textContent = "Отправка недоступна (откройте из Telegram).";
+            // #region agent log
+            _agentLog("no Telegram.sendData", {});
+            // #endregion
+            msgEl.textContent = "Отправка недоступна (откройте форму из Telegram).";
           }
         };
       }
