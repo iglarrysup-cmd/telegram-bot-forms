@@ -20,6 +20,7 @@
     button:disabled { opacity: 0.6; cursor: not-allowed; }
     .error { color: #c00; font-size: 0.85rem; margin-top: 8px; }
     .success { color: #0a0; margin-top: 12px; }
+    .notice { background: rgba(200, 120, 0, 0.2); border: 1px solid #c80; border-radius: 8px; padding: 10px 12px; margin-bottom: 16px; font-size: 0.9rem; }
   </style>
 </head>
 <body>
@@ -129,7 +130,8 @@
           root.innerHTML = "<p>Неизвестный тип формы. Используйте кнопку в боте для выбора формы.</p>";
           return;
         }
-        var html = "<h2>" + escapeHtml(config.name) + "</h2>";
+        var html = '<div class="notice">Чтобы заявка попала в Jira, откройте форму кнопкой <b>внизу экрана</b> (над полем «Сообщение»), а не кнопкой под сообщением бота.</div>';
+        html += "<h2>" + escapeHtml(config.name) + "</h2>";
         config.fields.forEach(function(f) {
           var req = f.required ? " required" : "";
           var reqClass = f.required ? " required" : "";
@@ -196,7 +198,7 @@
               Telegram.sendData(JSON.stringify(payload));
               msgEl.className = "success";
               msgEl.textContent = "Отправлено. Окно закроется.";
-              if (Telegram.close) Telegram.close();
+              if (Telegram.close) setTimeout(function() { Telegram.close(); }, 400);
             } catch (e) {
               // #region agent log
               _agentLog("sendData error", { err: String(e && e.message || e) });
